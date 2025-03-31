@@ -1,12 +1,11 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import json
 from typing import Optional
 from app.utils.openai_client import get_openai_response
 from app.utils.file_handler import save_upload_file_temporarily
-
-# Import the functions you want to test directly
-from app.utils.functions import *
+from app.utils.functions import analyze_sales_with_phonetic_clustering, calculate_prettier_sha256
 
 app = FastAPI(title="IITM Assignment API")
 
@@ -18,7 +17,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.post("/api/")
 async def process_question(
@@ -37,6 +35,9 @@ async def process_question(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/")
+async def root():
+    return {"message": "FastAPI on Vercel is running!"}
 
 # New endpoint for testing specific functions
 @app.post("/debug/{function_name}")
@@ -47,11 +48,6 @@ async def debug_function(
 ):
     """
     Debug endpoint to test specific functions directly
-
-    Args:
-        function_name: Name of the function to test
-        file: Optional file upload
-        params: JSON string of parameters to pass to the function
     """
     try:
         # Save file temporarily if provided
@@ -69,26 +65,19 @@ async def debug_function(
         # Call the appropriate function based on function_name
         if function_name == "analyze_sales_with_phonetic_clustering":
             result = await analyze_sales_with_phonetic_clustering(**parameters)
-            return {"result": result}
         elif function_name == "calculate_prettier_sha256":
-            # For calculate_prettier_sha256, we need to pass the filename parameter
             if temp_file_path:
                 result = await calculate_prettier_sha256(temp_file_path)
-                return {"result": result}
             else:
                 return {"error": "No file provided for calculate_prettier_sha256"}
         else:
-            return {
-                "error": f"Function {function_name} not supported for direct testing"
-            }
+            return {"error": f"Function {function_name} not supported for direct testing"}
 
+        return {"result": result}
     except Exception as e:
         import traceback
-
         return {"error": str(e), "traceback": traceback.format_exc()}
 
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+# Vercel requires an ASGI-compatible app entry point
+def handler(event, context):
+    return app
